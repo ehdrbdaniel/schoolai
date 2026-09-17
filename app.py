@@ -24,7 +24,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-CAPACITY = 70  # 학년별 자습실 정원 (총 210명)
+CAPACITY = 66  # 학년별 자습실 정원 (총 210명)
 API_KEY = st.secrets["OPENWEATHER_API_KEY"]
 CITY_NAME = "Seoul"
 
