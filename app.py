@@ -23,9 +23,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 자습실 물리적 공간 정원 정의
-DEDICATED_CAPACITY = 40  # 각 학년별 전용실 정원
-COMMON_CAPACITY = 100  # 공용 자습실 정원
+# 학년별 자습실 정원 (각 80명)
+CAPACITY = 80
 
 API_KEY = st.secrets["OPENWEATHER_API_KEY"]
 CITY_NAME = "Seoul"
@@ -199,71 +198,38 @@ else:
     )
     g1_pred, g2_pred, g3_pred, total_pred = 0, 0, 0, 0
 
-  # --- 공간 제약 및 오버플로우 계산 로직 ---
-  g1_dedicated = min(g1_pred, DEDICATED_CAPACITY)
-  g1_overflow = max(0, g1_pred - DEDICATED_CAPACITY)
-
-  g2_dedicated = min(g2_pred, DEDICATED_CAPACITY)
-  g2_overflow = max(0, g2_pred - DEDICATED_CAPACITY)
-
-  g3_dedicated = min(g3_pred, DEDICATED_CAPACITY)
-  g3_overflow = max(0, g3_pred - DEDICATED_CAPACITY)
-
-  total_common_users = g1_overflow + g2_overflow + g3_overflow
-  common_rate = min(100, round((total_common_users / COMMON_CAPACITY) * 100))
-
-  g1_rate = round((g1_dedicated / DEDICATED_CAPACITY) * 100)
-  g2_rate = round((g2_dedicated / DEDICATED_CAPACITY) * 100)
-  g3_rate = round((g3_dedicated / DEDICATED_CAPACITY) * 100)
+  # 학년별 정원 80명 기준 점유율 계산
+  g1_rate = min(100, round((g1_pred / CAPACITY) * 100))
+  g2_rate = min(100, round((g2_pred / CAPACITY) * 100))
+  g3_rate = min(100, round((g3_pred / CAPACITY) * 100))
 
   # --- 화면 UI 출력 ---
   with st.container(border=True):
-    st.markdown("#### 🏫 학년별 전용실 현황 (정원 각 40명)")
-    c1, c2, c3 = st.columns(3)
+    st.markdown("#### 🏫 학년별 예상 인원 및 혼잡도 (정원 각 80명)")
+    c1, c2, c3, c4 = st.columns(4)
 
     c1.metric(
-        "1학년 전용실",
-        f"{g1_dedicated} / 40명",
+        "1학년 자습실",
+        f"{g1_pred}명",
         f"{g1_rate}% ({get_status(g1_rate)})",
     )
-    if g1_overflow > 0:
-      c1.caption(f"⚠️ 초과 인원 {g1_overflow}명 공용실 이동")
-
     c2.metric(
-        "2학년 전용실",
-        f"{g2_dedicated} / 40명",
+        "2학년 자습실",
+        f"{g2_pred}명",
         f"{g2_rate}% ({get_status(g2_rate)})",
     )
-    if g2_overflow > 0:
-      c2.caption(f"⚠️ 초과 인원 {g2_overflow}명 공용실 이동")
-
     c3.metric(
-        "3학년 전용실",
-        f"{g3_dedicated} / 40명",
+        "3학년 자습실",
+        f"{g3_pred}명",
         f"{g3_rate}% ({get_status(g3_rate)})",
     )
-    if g3_overflow > 0:
-      c3.caption(f"⚠️ 초과 인원 {g3_overflow}명 공용실 이동")
+    c4.metric("전체 인원 합계", f"{total_pred}명", "Total")
 
-  with st.container(border=True):
-    st.markdown("#### 🏛️ 공용 자습실 및 전체 현황")
-    col_common, col_total = st.columns(2)
-    col_common.metric(
-        "공용 자습실 (초과 인원 수용)",
-        f"{total_common_users} / 100명",
-        f"점유율 {common_rate}% ({get_status(common_rate)})",
-    )
-    col_total.metric(
-        "학교 전체 자습 신청 총원",
-        f"{total_pred}명",
-        "Total Demand",
-    )
-
-  st.markdown("#### 📈 학년별 전용실 점유율 비교")
+  st.markdown("#### 📈 학년별 혼잡도 비교 차트")
   chart_df = pd.DataFrame(
       {
-          "학년": ["1학년 전용실", "2학년 전용실", "3학년 전용실"],
-          "점유율(%)": [g1_rate, g2_rate, g3_rate],
+          "학년": ["1학년", "2학년", "3학년"],
+          "혼잡도(%)": [g1_rate, g2_rate, g3_rate],
       }
   )
   st.bar_chart(chart_df.set_index("학년"), color="#2563EB")
