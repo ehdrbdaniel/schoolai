@@ -1,4 +1,4 @@
-Date,day_of_week,time_slot,exam_dday,is_exam,is_raining,g1,g2,g3,total
+date,day_of_week,time_slot,exam_dday,is_exam,is_raining,g1,g2,g3,total
 2026-07-01,2,1,0,1,1,2,6,2,10
 2026-07-01,2,2,0,1,1,3,12,5,20
 2026-07-01,2,3,0,1,1,5,13,7,25
