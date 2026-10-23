@@ -1,4 +1,5 @@
 import datetime
+import os
 import joblib
 import pandas as pd
 import requests
@@ -26,17 +27,28 @@ st.markdown(
 # 학년별 자습실 정원 (각 80명)
 CAPACITY = 80
 
-API_KEY = st.secrets["OPENWEATHER_API_KEY"]
+try:
+  API_KEY = st.secrets["OPENWEATHER_API_KEY"]
+except (FileNotFoundError, KeyError):
+  API_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
 CITY_NAME = "Seoul"
 
 
 # 2. 날씨 API 조회 함수
 def get_weather_forecast(api_key, target_date, city="Seoul"):
-  url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={api_key}&units=metric"
+  if not api_key:
+    return 0, "⚠️ OPENWEATHER_API_KEY가 설정되지 않았습니다. 날씨 없이 예측합니다."
+
   try:
-    response = requests.get(url, timeout=3)
-    data = response.json()
+    response = requests.get(
+        "https://api.openweathermap.org/data/2.5/forecast",
+        params={"q": city, "appid": api_key, "units": "metric"},
+        timeout=3,
+    )
+    if response.status_code == 401:
+      return 0, "⚠️ OpenWeather API 키가 유효하지 않거나 활성화되지 않았습니다."
     if response.status_code == 200:
+      data = response.json()
       target_str = target_date.strftime("%Y-%m-%d")
       day_forecasts = [
           item
@@ -59,9 +71,11 @@ def get_weather_forecast(api_key, target_date, city="Seoul"):
       else:
         return 0, f"ℹ️ [{city}] 5일 예보 범위를 벗어난 날짜 (기본 맑음)"
     else:
-      return 0, f"⚠️ 날씨 API 오류 발생"
-  except Exception:
-    return 0, f"⚠️ 네트워크 연결 실패"
+      return 0, f"⚠️ 날씨 API 오류 발생 (HTTP {response.status_code})"
+  except ValueError:
+    return 0, "⚠️ 날씨 API 응답을 읽을 수 없습니다."
+  except requests.RequestException:
+    return 0, "⚠️ 네트워크 연결 실패"
 
 
 # 3. 혼잡도 상태 반환 함수
@@ -174,6 +188,11 @@ else:
   )
 
   try:
+    if not os.path.exists("study_room_model.pkl"):
+      raise FileNotFoundError(
+          "⚠️ 학습된 모델 파일(`study_room_model.pkl`)이 없습니다."
+      )
+
     model = joblib.load("study_room_model.pkl")
     input_data = pd.DataFrame(
         [[day_of_week, time_slot, exam_dday, is_exam, is_raining]],
@@ -190,13 +209,15 @@ else:
     g1_pred = max(0, int(round(pred[0])))
     g2_pred = max(0, int(round(pred[1])))
     g3_pred = max(0, int(round(pred[2])))
-    total_pred = max(0, int(round(pred[3])))
+    # 전체 인원은 학년별 예측값의 합으로 일관성 유지
+    total_pred = g1_pred + g2_pred + g3_pred
 
-  except Exception:
-    st.error(
-        "⚠️ AI 모델 파일을 찾지 못했습니다. 터미널에서 `python train_model.py`를 먼저 실행해 주세요."
-    )
-    g1_pred, g2_pred, g3_pred, total_pred = 0, 0, 0, 0
+  except FileNotFoundError as fnf_err:
+    st.error(f"{fnf_err} 터미널에서 `python train_model.py`를 먼저 실행해 주세요.")
+    st.stop()
+  except Exception as e:
+    st.error(f"⚠️ 예측 처리 중 오류가 발생했습니다: {e}")
+    st.stop()
 
   # 학년별 정원 80명 기준 점유율 계산
   g1_rate = min(100, round((g1_pred / CAPACITY) * 100))
@@ -232,4 +253,8 @@ else:
           "혼잡도(%)": [g1_rate, g2_rate, g3_rate],
       }
   )
-  st.bar_chart(chart_df.set_index("학년"), color="#2563EB")
+
+  # 차트 가로폭을 줄이기 위해 컬럼으로 가운데 배치 ([1, 2, 1] 비율)
+  left_col, center_col, right_col = st.columns([1, 2, 1])
+  with center_col:
+    st.bar_chart(chart_df.set_index("학년"), color="#2563EB")
